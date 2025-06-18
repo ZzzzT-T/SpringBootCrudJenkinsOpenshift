@@ -8,7 +8,7 @@ pipeline {
     stages {
         stage('Clone') {
             steps {
-                git url: 'https://github.com/username/projectname.git', branch:'main'
+                git url: 'https://github.com/ZzzzT-T/SpringBootCrudJenkinsOpenshift.git', branch:'main'
             }
         }
 
