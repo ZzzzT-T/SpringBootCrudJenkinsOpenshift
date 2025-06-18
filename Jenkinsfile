@@ -2,65 +2,52 @@ pipeline {
     agent any
 
     tools {
-        maven 'M3'
-    }
-
-    environment {
-        IMAGE_NAME = 'springboot-app'
-        IMAGE_TAG = 'latest'
-        OPENSHIFT_PROJECT = 'zzzzt-dev'
-        OPENSHIFT_REGISTRY = 'image-registry.openshiftapps.com'
-        OPENSHIFT_CLUSTER = 'https://api.openshift.example.com:6443'
-        OPENSHIFT_TOKEN = credentials('OPENSHIFT_TOKEN') // Add this in Jenkins Credentials
+        maven 'M3'  // Make sure 'M3' is configured in Jenkins as a Maven installation
     }
 
     stages {
-        stage('Checkout') {
+        stage('Clone') {
             steps {
-                git url: 'https://github.com/ZzzzT-T/SpringBootCrudJenkinsOpenshift.git', branch: 'main'
+                git 'https://github.com/username/projectname.git' // ✅ update this with the actual repo URL
             }
         }
 
-        stage('Build with Maven') {
+        stage('Build') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                sh 'mvn clean compile'
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Test') {
             steps {
-                 sh """
-                    docker build -t ${REGISTRY}/${PROJECT}/${IMAGE_NAME}:${IMAGE_TAG} .
-                """
+                sh 'mvn test'
             }
         }
 
-        stage('Push to OpenShift Registry') {
+        stage('Package') {
             steps {
-                withCredentials([string(credentialsId: 'OPENSHIFT_TOKEN', variable: 'OPENSHIFT_TOKEN')]) {
-                    sh '''
-                        echo "$OPENSHIFT_TOKEN" | docker login -u openshift --password-stdin ${REGISTRY}
-                        docker push ${REGISTRY}/${PROJECT}/${IMAGE_NAME}:${IMAGE_TAG}
-                    '''
-                }
+                sh 'mvn package -DskipTests'
             }
         }
 
-        stage('Deploy to OpenShift') {
+        // Optional: Run app locally (only for internal testing)
+        stage('Deploy (Run Spring Boot)') {
             steps {
-                sh '''
-                    oc patch deployment springboot-app -p '{"spec":{"template":{"metadata":{"annotations":{"date":"'''$(date)'''"} }}}}'
-                '''
+                sh 'nohup java -jar target/*.jar > app.log 2>&1 &'
             }
         }
     }
 
     post {
+        always {
+            echo 'Cleaning up...'
+            cleanWs()
+        }
         success {
-            echo 'Deployment to OpenShift completed successfully.'
+            echo 'Pipeline completed successfully.'
         }
         failure {
-            echo 'Pipeline failed. Check logs.'
+            echo 'Pipeline failed.'
         }
     }
 }
