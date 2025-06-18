@@ -29,21 +29,19 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    def imageFull = "${env.OPENSHIFT_REGISTRY}/${env.OPENSHIFT_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
-                    sh "docker build -t ${imageFull} ."
-                }
+                 sh """
+                    docker build -t ${REGISTRY}/${PROJECT}/${IMAGE_NAME}:${IMAGE_TAG} .
+                """
             }
         }
 
         stage('Push to OpenShift Registry') {
             steps {
-                script {
-                    def imageFull = "${env.OPENSHIFT_REGISTRY}/${env.OPENSHIFT_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
-                    sh """
-                        echo $OPENSHIFT_TOKEN | docker login -u openshift --password-stdin ${env.OPENSHIFT_REGISTRY}
-                        docker push ${imageFull}
-                    """
+                withCredentials([string(credentialsId: 'OPENSHIFT_TOKEN', variable: 'OPENSHIFT_TOKEN')]) {
+                    sh '''
+                        echo "$OPENSHIFT_TOKEN" | docker login -u openshift --password-stdin ${REGISTRY}
+                        docker push ${REGISTRY}/${PROJECT}/${IMAGE_NAME}:${IMAGE_TAG}
+                    '''
                 }
             }
         }
@@ -51,11 +49,7 @@ pipeline {
         stage('Deploy to OpenShift') {
             steps {
                 sh '''
-                    oc login --token=$OPENSHIFT_TOKEN --server=$OPENSHIFT_CLUSTER
-                    oc project $OPENSHIFT_PROJECT
-
-                    oc set image deployment/springboot-app springboot-app=${OPENSHIFT_REGISTRY}/${OPENSHIFT_PROJECT}/${IMAGE_NAME}:${IMAGE_TAG} --record
-                    oc rollout restart deployment/springboot-app
+                    oc patch deployment springboot-app -p '{"spec":{"template":{"metadata":{"annotations":{"date":"'''$(date)'''"} }}}}'
                 '''
             }
         }
