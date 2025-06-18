@@ -8,7 +8,7 @@ pipeline {
     environment {
         IMAGE_NAME = 'springboot-app'
         IMAGE_TAG = 'latest'
-        OPENSHIFT_PROJECT = 'your-project'
+        OPENSHIFT_PROJECT = 'zzzzt-dev'
         OPENSHIFT_REGISTRY = 'image-registry.openshiftapps.com'
         OPENSHIFT_CLUSTER = 'https://api.openshift.example.com:6443'
         OPENSHIFT_TOKEN = credentials('OPENSHIFT_TOKEN') // Add this in Jenkins Credentials
