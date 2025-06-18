@@ -1,28 +1,15 @@
-# Use an official Maven image to build the app
-FROM maven:3.9.6-eclipse-temurin-21 AS build
+# Use a lightweight Java 17 image
+FROM eclipse-temurin:17-jdk-alpine
 
+# Set the working directory in the container
 WORKDIR /app
 
-# Copy pom.xml and download dependencies
-COPY pom.xml .
-RUN mvn dependency:go-offline
+# Copy the JAR file built by Maven
+ARG JAR_FILE=target/*.jar
+COPY ${JAR_FILE} app.jar
 
-# Copy source code
-COPY src ./src
-
-# Pcdackage the application
-RUN mvn clean package -DskipTests
-
-# Use a lightweight JRE to run the app
-FROM eclipse-temurin:21-jre
-
-WORKDIR /app
-
-# Copy the built jar from the build stage
-COPY --from=build /app/target/*.jar app.jar
-
-# Expose port 8080
+# Expose the default Spring Boot port
 EXPOSE 8080
 
-# Run the application
+# Run the JAR
 ENTRYPOINT ["java", "-jar", "app.jar"]

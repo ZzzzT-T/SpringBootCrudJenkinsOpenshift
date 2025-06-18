@@ -2,52 +2,71 @@ pipeline {
     agent any
 
     tools {
-        maven 'M3'  // Make sure 'M3' is configured in Jenkins as a Maven installation
+        maven 'M3'
+    }
+
+    environment {
+        IMAGE_NAME = 'springboot-app'
+        IMAGE_TAG = 'latest'
+        OPENSHIFT_PROJECT = 'your-project'
+        OPENSHIFT_REGISTRY = 'image-registry.openshiftapps.com'
+        OPENSHIFT_CLUSTER = 'https://api.openshift.example.com:6443'
+        OPENSHIFT_TOKEN = credentials('OPENSHIFT_TOKEN') // Add this in Jenkins Credentials
     }
 
     stages {
-        stage('Clone') {
+        stage('Checkout') {
             steps {
-                git url: 'https://github.com/ZzzzT-T/SpringBootCrudJenkinsOpenshift.git', branch: 'main' //
+                git url: 'https://github.com/ZzzzT-T/SpringBootCrudJenkinsOpenshift.git', branch: 'main'
             }
         }
 
-        stage('Build') {
+        stage('Build with Maven') {
             steps {
-                sh 'mvn clean compile'
+                sh 'mvn clean package -DskipTests'
             }
         }
 
-        stage('Test') {
+        stage('Build Docker Image') {
             steps {
-                sh 'mvn test'
+                script {
+                    def imageFull = "${env.OPENSHIFT_REGISTRY}/${env.OPENSHIFT_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                    sh "docker build -t ${imageFull} ."
+                }
             }
         }
 
-        stage('Package') {
+        stage('Push to OpenShift Registry') {
             steps {
-                sh 'mvn package -DskipTests'
+                script {
+                    def imageFull = "${env.OPENSHIFT_REGISTRY}/${env.OPENSHIFT_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                    sh """
+                        echo $OPENSHIFT_TOKEN | docker login -u openshift --password-stdin ${env.OPENSHIFT_REGISTRY}
+                        docker push ${imageFull}
+                    """
+                }
             }
         }
 
-        // Optional: Run app locally (only for internal testing)
-        stage('Deploy (Run Spring Boot)') {
+        stage('Deploy to OpenShift') {
             steps {
-                sh 'nohup java -jar target/*.jar > app.log 2>&1 &'
+                sh '''
+                    oc login --token=$OPENSHIFT_TOKEN --server=$OPENSHIFT_CLUSTER
+                    oc project $OPENSHIFT_PROJECT
+
+                    oc set image deployment/springboot-app springboot-app=${OPENSHIFT_REGISTRY}/${OPENSHIFT_PROJECT}/${IMAGE_NAME}:${IMAGE_TAG} --record
+                    oc rollout restart deployment/springboot-app
+                '''
             }
         }
     }
 
     post {
-        always {
-            echo 'Cleaning up...'
-            cleanWs()
-        }
         success {
-            echo 'Pipeline completed successfully.'
+            echo 'Deployment to OpenShift completed successfully.'
         }
         failure {
-            echo 'Pipeline failed.'
+            echo 'Pipeline failed. Check logs.'
         }
     }
 }
